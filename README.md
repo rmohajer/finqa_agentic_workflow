@@ -1,13 +1,8 @@
-# ConvFinQA Assignment
-
-
-Thank you for taking the time to do this assignment! Please see the [main Notion page](https://tomoroai.notion.site/Technical-Assignment-1fa0de3387ea80debb36cda4ae41e93d) for the full instructions. 
-
+# ConvFinQA Challenge
 
 We have cleaned up the dataset; please see `dataset.md` for more information. We recommend you use this version of the data for the assignment, as it will save you a lot of time. If you have any questions, please don't hesitate to ask your point of contact. 
 
 
-Good luck! 
 
 ## Get started
 ### Prerequisites
@@ -50,7 +45,7 @@ uv run main chat <record_id>
 [![Chat](figures/chat_example.png)](figures/chat.png)  
 
 ## Submission 
-Please make a submission branch & make a PR to main. The PR should contain: 
+To complete
 
 
 - A solution to the main task
