@@ -1,13 +1,17 @@
 # ConvFinQA Challenge
 
-We have cleaned up the dataset; please see `dataset.md` for more information. We recommend you use this version of the data for the assignment, as it will save you a lot of time. If you have any questions, please don't hesitate to ask your point of contact. 
+# ConvFinQA Challenge
+
+Lightweight demo and tooling for conversational numerical reasoning over financial documents (ConvFinQA). This repo provides a Gradio-based app, dataset helpers, and agent scaffolding to parse PDFs, embed document chunks, and answer multi-turn finance questions.
+
+
+DATASET: please see `dataset.md` for more information. We recommend you use this version of the data for the assignment, as it will save you a lot of time. If you have any questions, please don't hesitate to ask your point of contact. 
 
 
 
 ## Get started
 ### Prerequisites
 - Python 3.12+
-- [UV environment manager](https://docs.astral.sh/uv/getting-started/installation/)
 
 ### Setup
 1. Clone this repository
@@ -24,37 +28,16 @@ uv sync
 uv add <package_name>
 ```
 
-### [optional] Use CLI to chat
+## Quick links
+- Dataset description: [dataset.md](dataset.md)  
+- Main entry: [src/main.py](src/main.py) — see [`src.main.generate_session_id`](src/main.py), [`src.main.handle_pdf_upload`](src/main.py), [`src.main.chat_with_pdf`](src/main.py)  
+- Agent core: [src/agentic_system.py](src/agentic_system.py) — see [`agentic_system.FinQAResponseAgent`](src/agentic_system.py)  
+- Parsing helpers: [src/parsing_helpers.py](src/parsing_helpers.py) — see [`parsing_helpers.fin_doc_parser`](src/parsing_helpers.py)  
+- Project metadata: [pyproject.toml](pyproject.toml)  
+- Example data: [data/convfinqa_dataset.json](data/convfinqa_dataset.json)  
+- Notebooks: [notebooks/agentic_experiment.ipynb](notebooks/agentic_experiment.ipynb), [notebooks/data_parsing_experiment.ipynb](notebooks/data_parsing_experiment.ipynb)
 
-We have created a boilerplate cli app using [typer](https://typer.tiangolo.com/) (sister of fastapi, built on click) so there is a simple chat interface, which you can extend to meet your needs if you so choose.  By default the chat responds with a standard message as shown below.
-
-
-We've installed the app as a script, so you can run it with:
-```bash 
-uv run main
-```
-or you can use the longer form:
-```bash
-uv run python src/main.py
-```
-
-How to *chat*:
-```bash
-uv run main chat <record_id> 
-```
-[![Chat](figures/chat_example.png)](figures/chat.png)  
-
-## Submission 
-To complete
-
-
-- A solution to the main task
-- A report summarising your findings. We have sketched out a template for you in `REPORT.md`, but you can use any other setup (like LaTeX) if you prefer.
-- Please send a link to the PR to [recruitment@tomoro.ai](mailto:recruitment@tomoro.ai) with the subject `submission: <your name>`.
-  
-NOTE: Please DO NOT merge any of your submission to main, all of your work should be on your branch `submission`. 
-
-
-**Please let us know if you used any AI tools to help generate code for your assignment.**
-Using AI-powered IDEs or coding assistants is acceptable, as these are commonly used in real-world environments, and this assignment is intended to reflect that. If you’ve used AI tools to help you write code or your report, or any other part of your process, we ask that you disclose how and where you used them. This isn’t to catch you out. It’s an opportunity to show that you understand how to use these tools effectively and responsibly as part of your workflow.
-
+## What this repo contains
+- A Gradio UI app to upload PDFs, parse them into text/table chunks, compute embeddings, and run a FinQA-style agent over the parsed content. Entrypoint and UI logic live in [src/main.py](src/main.py).
+- Agent and state management are implemented in [src/agentic_system.py](src/agentic_system.py) (the `FinQAResponseAgent` driven agent and related graph/state).
+- Document parsing and embedding helpers in [src/parsing// filepath: README.md
