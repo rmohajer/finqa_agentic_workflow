@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "pre_tool": [
+      {
+        "match": "execute",
+        "command": "python3 .opencode/hooks/require_permission_before_execute.py"
+      },
+      {
+        "match": "shell",
+        "command": "python3 .opencode/hooks/require_permission_before_execute.py"
+      }
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+# FinQA Agentic Workflow Configuration
+# Common configuration variables shared across the application
+
+# LLM Configuration
+NVIDIA_MODEL: "nvidia/nemotron-3.5-bolt-e4b"
+GROQ_MODEL: "openai/gpt-oss-120b"
+LLM_TEMPERATURE: 0
+LLM_MAX_TOKENS: 1024
+
+# Embedding Configuration
+EMBEDDING_MODEL_NAME: "nvidia/nemotron-3.5-embed-1b"
+
+# NVIDIA-specific parameters
+NVIDIA_CHAT_TEMPLATE_KWARGS:
+  reasoning_effort: null
+
+# Document Processing
+MIN_CHUNK_LENGTH: 800
+
+# Document AI Configuration
+DOC_AI_LOCATION: "australia-southeast1"
+# Form Parser (legacy, paid)
+DOC_AI_PROCESSOR_ID: "e1dfbf6e967f9ffe"
+# Enterprise Document OCR (free tier: 1000 pages/month)
+DOC_AI_OCR_PROCESSOR_ID: "e1dfbf6e967f9ffe"
+DOC_AI_OCR_PROCESSOR_VERSION: "pretrained-ocr-v2.0-2023-06-02"
+# Parser type: "form" (paid), "ocr" (free tier), "layout" (paid)
+DOC_AI_PARSER_TYPE: "ocr"
