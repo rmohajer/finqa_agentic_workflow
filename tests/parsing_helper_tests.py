@@ -6,7 +6,7 @@ import sys
 import pytest
 import numpy as np
 import pandas as pd
-from unittest.mock import Mock, patch, MagicMock, PropertyMock
+from unittest.mock import Mock, patch, MagicMock, PropertyMock, mock_open
 from langchain_core.documents import Document
 
 # Add project root to path
@@ -825,21 +825,31 @@ class TestSummarizeDoc:
 # ============================================================================
 
 class TestParseWithDocAi:
-    """Tests for parse_with_doc_ai function (mocked)."""
+    """Tests for parse_with_doc_ai function (mocked) - uses Enterprise Document OCR."""
 
     @patch("src.parsing_helpers.load_dotenv")
     @patch("src.parsing_helpers.documentai")
     @patch("src.parsing_helpers.ClientOptions")
-    @patch("src.parsing_helpers._doc_ai_to_markdown")
+    @patch("src.parsing_helpers._ocr_document_to_markdown")
     def test_parse_with_doc_ai_success(self, mock_to_markdown, mock_client_options, mock_documentai, mock_load_dotenv):
-        """Test successful Document AI parsing."""
+        """Test successful Document AI OCR parsing."""
         mock_to_markdown.return_value = "Parsed markdown content"
         
         mock_client = Mock()
         mock_documentai.DocumentProcessorServiceClient.return_value = mock_client
         
+        # Create mock pages with paragraphs (OCR format)
+        mock_page1 = Mock()
+        mock_page1.paragraphs = [Mock(), Mock()]  # 2 paragraphs
+        mock_page1.tables = []
+        mock_page1.blocks = []
+        mock_page2 = Mock()
+        mock_page2.paragraphs = [Mock()]  # 1 paragraph
+        mock_page2.tables = []
+        mock_page2.blocks = []
+        
         mock_document = Mock()
-        mock_document.pages = [Mock(), Mock()]  # 2 pages
+        mock_document.pages = [mock_page1, mock_page2]  # 2 pages
         mock_document.text = "Document text content"
         mock_result = Mock()
         mock_result.document = mock_document
@@ -867,9 +877,12 @@ class TestParseWithDocAi:
     @patch("src.parsing_helpers.load_dotenv")
     def test_missing_processor_id(self, mock_load_dotenv):
         """Test error when processor ID not set."""
-        with patch.dict(os.environ, {"GOOGLE_CLOUD_PROJECT": "test"}, clear=True):
-            with pytest.raises(ValueError, match="DOC_AI_PROCESSOR_ID not set"):
-                parse_with_doc_ai("test.pdf")
+        # Need to clear both env var and config value
+        with patch("src.parsing_helpers.config", {"DOC_AI_OCR_PROCESSOR_ID": ""}):
+            with patch.dict(os.environ, {"GOOGLE_CLOUD_PROJECT": "test"}, clear=True):
+                with patch("builtins.open", mock_open(read_data=b"%PDF-1.4 test")):
+                    with pytest.raises(ValueError, match="DOC_AI_OCR_PROCESSOR_ID not set"):
+                        parse_with_doc_ai("test.pdf")
 
     def test_import_error(self):
         """Test error when google-cloud-documentai not installed."""
@@ -880,7 +893,7 @@ class TestParseWithDocAi:
     @patch("src.parsing_helpers.load_dotenv")
     @patch("src.parsing_helpers.documentai")
     @patch("src.parsing_helpers.ClientOptions")
-    @patch("src.parsing_helpers._doc_ai_to_markdown")
+    @patch("src.parsing_helpers._ocr_document_to_markdown")
     def test_page_limit_exceeded_fallback(self, mock_to_markdown, mock_client_options, mock_documentai, mock_load_dotenv):
         """Test fallback to batch processing on page limit error."""
         mock_to_markdown.return_value = "Batch result"
@@ -906,54 +919,21 @@ class TestParseWithDocAi:
     @patch("src.parsing_helpers.load_dotenv")
     @patch("src.parsing_helpers.documentai")
     @patch("src.parsing_helpers.ClientOptions")
-    @patch("src.parsing_helpers._doc_ai_to_markdown")
-    def test_imageless_mode_enabled(self, mock_to_markdown, mock_client_options, mock_documentai, mock_load_dotenv):
-        """Test imageless_mode is set on process_options."""
-        mock_to_markdown.return_value = "Result"
-        
-        mock_client = Mock()
-        mock_documentai.DocumentProcessorServiceClient.return_value = mock_client
-        mock_document = Mock()
-        mock_document.pages = [Mock(), Mock()]
-        mock_document.text = "Document text content"
-        mock_result = Mock()
-        mock_result.document = mock_document
-        mock_client.process_document.return_value = mock_result
-        
-        # Capture the request argument and verify process_options
-        captured_request = {}
-        def capture_request(request):
-            captured_request['request'] = request
-            return mock_result
-        mock_client.process_document.side_effect = capture_request
-        
-        import tempfile
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
-            f.write(b"%PDF-1.4 test content")
-            pdf_path = f.name
-        
-        try:
-            result = parse_with_doc_ai(pdf_path, imageless_mode=True)
-            request = captured_request.get('request')
-            assert request is not None
-            # The request.process_options is a MagicMock, check if imageless_mode was set
-            # Since we can't easily test the protobuf, just verify the call was made
-            mock_client.process_document.assert_called_once()
-        finally:
-            os.unlink(pdf_path)
-
-    @patch("src.parsing_helpers.load_dotenv")
-    @patch("src.parsing_helpers.documentai")
-    @patch("src.parsing_helpers.ClientOptions")
-    @patch("src.parsing_helpers._doc_ai_to_markdown")
+    @patch("src.parsing_helpers._ocr_document_to_markdown")
     def test_page_numbers_parameter(self, mock_to_markdown, mock_client_options, mock_documentai, mock_load_dotenv):
         """Test page_numbers parameter creates page selector."""
         mock_to_markdown.return_value = "Result"
         
         mock_client = Mock()
         mock_documentai.DocumentProcessorServiceClient.return_value = mock_client
+        
+        mock_page1 = Mock()
+        mock_page1.paragraphs = [Mock()]
+        mock_page1.tables = []
+        mock_page1.blocks = []
+        
         mock_document = Mock()
-        mock_document.pages = [Mock(), Mock()]
+        mock_document.pages = [mock_page1]
         mock_document.text = "Document text content"
         mock_result = Mock()
         mock_result.document = mock_document
@@ -977,6 +957,43 @@ class TestParseWithDocAi:
             assert request is not None
             # Verify the call was made with page_numbers
             mock_client.process_document.assert_called_once()
+        finally:
+            os.unlink(pdf_path)
+
+    @patch("src.parsing_helpers.load_dotenv")
+    @patch("src.parsing_helpers.documentai")
+    @patch("src.parsing_helpers.ClientOptions")
+    @patch("src.parsing_helpers._ocr_document_to_markdown")
+    def test_ocr_version_not_found_fallback(self, mock_to_markdown, mock_client_options, mock_documentai, mock_load_dotenv):
+        """Test fallback when OCR processor version not found."""
+        mock_to_markdown.return_value = "Result"
+        
+        mock_client = Mock()
+        mock_documentai.DocumentProcessorServiceClient.return_value = mock_client
+        
+        # First call raises PROCESSOR_VERSION_NOT_FOUND, second succeeds
+        mock_document = Mock()
+        mock_page = Mock()
+        mock_page.paragraphs = [Mock()]
+        mock_page.tables = []
+        mock_page.blocks = []
+        mock_document.pages = [mock_page]
+        mock_document.text = "Document text content"
+        mock_result = Mock()
+        mock_result.document = mock_document
+        
+        error = Exception("PROCESSOR_VERSION_NOT_FOUND: ProcessorVersion with id 'xyz' not found")
+        mock_client.process_document.side_effect = [error, mock_result]
+        
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+            f.write(b"%PDF-1.4 test content")
+            pdf_path = f.name
+        
+        try:
+            result = parse_with_doc_ai(pdf_path)
+            assert result == "Result"
+            assert mock_client.process_document.call_count == 2
         finally:
             os.unlink(pdf_path)
 

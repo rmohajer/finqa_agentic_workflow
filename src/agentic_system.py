@@ -1,21 +1,21 @@
 
 import asyncio
 import os
-import yaml
-from pathlib import Path
+
+
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from dotenv import load_dotenv
 # from langchain_mistralai import MistralAIEmbeddings
 import pandas as pd
-import json
+
 import numpy as np
-import sys
+import Path
 from dotenv import load_dotenv
 from langchain_huggingface import HuggingFaceEmbeddings
 from typing import  (List, Annotated,Sequence,TypedDict,Any,Optional,Dict,Union,Literal)
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, ToolMessage,SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, PromptTemplate
-from pydantic import BaseModel, Field
+
 from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.types import interrupt, Command
 from langgraph.graph.message import add_messages
@@ -26,14 +26,10 @@ from src.parsing_helpers import fin_doc_parser
 from src.parsing_helpers import find_relevant_document_fast, parse_embedding
 from src.tool_helpers import tools, tools_by_name, tool_names
 from src.prompt_helpers import system_message, user_message_new, user_message_tool
+from src.tool_helpers import load_config
 
 
-# Load configuration from YAML file
-def load_config():
-    """Load configuration from config-common-yaml file."""
-    config_path = Path(__file__).parent.parent / "config" / "config-common-yaml"
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
+
 
 config = load_config()
 

@@ -1,9 +1,17 @@
 
 # math tools
 from langchain.tools import tool
-import math
+import math, yaml
+from pathlib import Path
 from typing import (List, Annotated,Sequence,TypedDict,Any,Optional,Dict,Union,Literal)
 from src.prompt_helpers import model_call_output
+
+# Load configuration from YAML file
+def load_config():
+    """Load configuration from config-common-yaml file."""
+    config_path = Path(__file__).parent.parent / "config" / "config-common-yaml"
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
 
 @tool("add", return_direct=True)
 def add(a: float, b: float) -> float:

@@ -2,7 +2,7 @@
 # Common configuration variables shared across the application
 
 # LLM Configuration
-NVIDIA_MODEL: "nvidia/nemotron-3.5-bolt-e4b"
+NVIDIA_MODEL: "nvidia/nemotron-3.5-super-vl-120b-a12b"
 GROQ_MODEL: "openai/gpt-oss-120b"
 LLM_TEMPERATURE: 0
 LLM_MAX_TOKENS: 1024
