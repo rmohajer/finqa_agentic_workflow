@@ -2,19 +2,22 @@
 
 ## Quick Start
 ```bash
-export NVIDIA_API_KEY="your_key"  # Required for LLM
+export NVIDIA_API_KEY="your_key"  # Required for LLM (Nemotron 3 Ultra)
+export NVIDIA_EMBEDDING_API_KEY="your_key"  # Required for embeddings (Nemotron 3.5 Embed 1B)
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/gcp-key.json"  # For Document AI (optional)
 uv sync  # or pip install -e ".[test]"
 python app.py  # Launches Gradio on localhost:7860 (share=False)
 ```
 
 ## Architecture Essentials
-- **Entry point**: `app.py` → Gradio UI + async handlers
+- **Entry point**: `app.py` → Gradio UI + async handlers + session management
 - **Agent**: `agentic_system.py` → LangGraph ReAct agent (`finqa_graph`) + `FinQAResponseAgent` wrapper
-- **State**: `FinState` (extends `MessagesState`) tracks report_state, user_query[], call_mode, context_content, context_examples
+- **State**: `FinState` (extends `MessagesState`) tracks report_state, user_query[], call_mode, context_content, context_examples, query_cont
 - **Two retrieval systems**: User PDF chunks (`df_docs.content_embed`) + ConvFinQA examples (`df_finqa.summary_emb`)
 - **Structured output**: Enforced via `model_call_tool` (Pydantic schema: Thought[], References[], Final_answer)
-- **Two PDF parsers**: Docling (local, CPU) + Google Document AI (cloud, Form Parser)
+- **Two PDF parsers**: Docling (local, CPU) + Google Document AI (cloud, OCR/Layout/Form)
+- **Configuration**: Centralized in `config/config-common-yaml`
+- **ConvFinQA embeddings**: Cached in `data/convfinqa_embeddings_cache.npy`, lazy init, pre-computed at startup
 
 ## Key Commands
 ```bash
@@ -30,19 +33,21 @@ python tests.py parsing  # Run test runner
 2. **Cache cleaning on startup** (app.py:18-27) — aggressive, removes HF/pip caches
 3. **No persistence** — `InMemorySaver` loses state on restart
 4. **Single global agent** — `FinQAAgent` shared across users (isolated by `thread_id`)
-5. **Hardcoded model** — `nvidia/nemotron-3-ultra-550b-a55b` in agentic_system.py:35
+5. **Model config** — `NVIDIA_MODEL` in `config/config-common-yaml` is single source of truth
 
 ## File Responsibilities
 | File | Purpose |
 |------|---------|
-| `app.py` | Gradio UI, PDF upload, chat handlers, parser dropdown |
-| `agentic_system.py` | LangGraph nodes, FinState, FinQAResponseAgent |
+| `app.py` | Gradio UI, PDF upload, chat handlers, parser dropdown, session management |
+| `agentic_system.py` | LangGraph nodes, FinState, FinQAResponseAgent, lazy embedding init |
 | `prompt_helpers.py` | System/user prompt templates |
-| `tool_helpers.py` | Math tools + `model_call_tool` output schema |
-| `parsing_helpers.py` | Docling PDF→MD, Google Document AI, MarkdownHeaderTextSplitter, embeddings, similarity search |
+| `tool_helpers.py` | Math tools + `model_call_tool` output schema + config loader |
+| `parsing_helpers.py` | Docling PDF→MD, Google Document AI (OCR/Layout/Form), MarkdownHeaderTextSplitter, embeddings, similarity search |
+| `config/config-common-yaml` | Centralized config (models, chunk length, Document AI) |
 | `data/convfinqa_filtered.csv` | Few-shot examples (loaded at startup) |
-| `tests/parsing_helper_tests.py` | Unit tests for parsing_helpers.py |
+| `tests/parsing_helper_tests.py` | Unit tests for parsing_helpers.py (81 tests) |
 | `tests.py` | Main test runner CLI |
+| `scratch/data_parsing_experiment.ipynb` | Data prep pipeline (summaries, embeddings, restructuring) |
 
 ## Modification Entry Points
 - Add tools → `tool_helpers.py`
@@ -51,7 +56,7 @@ python tests.py parsing  # Run test runner
 - Adjust parsing → `parsing_helpers.py`
 - UI changes → `app.py`
 - Add tests → `tests/parsing_helper_tests.py`
-
+- Config changes → `config/config-common-yaml`
 
 ## Agent Permissions
 - **MUST ask before any `edit`, `write`, or `patch` tool call**
@@ -115,9 +120,11 @@ For multi-step tasks, state a brief plan:
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
 ## Environment
-- `NVIDIA_API_KEY` — Required for LLM (Nemotron 3 Ultra)
+- `NVIDIA_API_KEY` — Required for LLM (Nemotron 3 Ultra via `ChatNVIDIA`)
+- `NVIDIA_EMBEDDING_API_KEY` — Required for embeddings (Nemotron 3.5 Embed 1B via `NVIDIAEmbeddings`)
+- `GROQ_API_KEY` — Fallback LLM (Groq `ChatGroq`)
 - `GOOGLE_CLOUD_PROJECT` — GCP project ID for Document AI
-- `DOC_AI_PROCESSOR_ID` — Document AI processor ID (Form Parser)
+- `DOC_AI_PROCESSOR_ID` — Document AI processor ID
 - `DOC_AI_LOCATION` — Processor location (e.g., `australia-southeast1`)
 - `GOOGLE_APPLICATION_CREDENTIALS` — Path to service account key JSON
 - Python 3.10+ (per pyproject.toml)
