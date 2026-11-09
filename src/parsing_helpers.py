@@ -525,20 +525,13 @@ def parse_embedding(s):
         raise ValueError(f"Unexpected embedding type: {type(s)}")
 
     # Remove brackets and extra spaces
-    s = s.strip().replace("[", "").replace("]", "").replace(",", " ")
-    # Split on spaces (one or more)
-    nums = re.split(r"\s+", s.strip())
-    # Convert to float safely
-    result = []
-    for x in nums:
-        if x == "":
-            continue
-        try:
-            result.append(float(x))
-        except ValueError:
-            raise ValueError(f"Invalid number '{x}' in embedding string: {s}")
+    s = s.strip().replace("[", "").replace("]", "")
+    # Split on commas
+    nums = re.split(r",", s.strip())
+    # Convert to float
+    return np.array([float(x) for x in nums if x != ""], dtype=float)
 
-    return np.array(result, dtype=float)
+
 
 def find_relevant_document_fast(embedding_model, query, df, embed_col, top_k=3):
     """

@@ -32,7 +32,7 @@ import uuid
 import pandas as pd
 import asyncio
 
-from src.agentic_system import FinState, finqa_graph, FinQAResponseAgent, min_chunk_length, _ensure_finqa_embeddings
+from src.agentic_system import FinState, finqa_graph, FinQAResponseAgent, min_chunk_length
 from src.parsing_helpers import fin_doc_parser, parse_embedding
 
 import shutil
@@ -49,10 +49,6 @@ for path in paths:
 
 print("🧹 Cache cleaned successfully!")
 
-# Pre-compute/load ConvFinQA embeddings at startup (before building app)
-print("🔄 Initializing ConvFinQA embeddings...")
-_ensure_finqa_embeddings()
-print("✅ ConvFinQA embeddings ready!")
 
 def generate_session_id():
     """Generate a unique session ID for each user."""

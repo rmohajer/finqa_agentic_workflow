@@ -1,7 +1,7 @@
 
 import asyncio
 import os
-
+from pathlib import Path
 
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from dotenv import load_dotenv
@@ -9,8 +9,6 @@ from dotenv import load_dotenv
 import pandas as pd
 
 import numpy as np
-import Path
-from dotenv import load_dotenv
 from langchain_huggingface import HuggingFaceEmbeddings
 from typing import  (List, Annotated,Sequence,TypedDict,Any,Optional,Dict,Union,Literal)
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, ToolMessage,SystemMessage
@@ -29,14 +27,19 @@ from src.prompt_helpers import system_message, user_message_new, user_message_to
 from src.tool_helpers import load_config
 
 
+"""
+It is assumed that we use the same embedding model for both the ConvFinQA dataset and the user-uploaded financial report or any other RAG application used in this project. If you want to use different embedding models for the ConvFinQA dataset and the user-uploaded financial report, you can modify the code accordingly. You would need to create separate embedding model instances for each and use them in their respective contexts. For example, you could have one embedding model for the ConvFinQA dataset and another for the user-uploaded financial report. Just make sure to pass the correct embedding model to the relevant functions when processing each type of data.
 
+Please use @data_parsing_experiment.ipynb to parse the ConvFinQA dataset and generate embeddings. The notebook will create a new CSV file with the parsed data and embeddings, which can then be used in this app.py code.
+
+"""
 
 config = load_config()
 
 load_dotenv()
 # Load the FinQA dataset
 
-df_finqa = pd.read_csv('data/convfinqa_filtered.csv')
+df_finqa = pd.read_csv('data/convfinqa_wembed.csv')
 
 # Parse the 'summary_emb' column from JSON strings to numpy arrays (old embeddings, will be replaced)
 df_finqa["summary_emb"] = df_finqa["summary_emb"].apply(parse_embedding)
@@ -55,22 +58,25 @@ MIN_CHUNK_LENGTH = config["MIN_CHUNK_LENGTH"]
 nvidia_api_key = os.getenv("NVIDIA_API_KEY")
 groq_api_key = os.getenv("GROQ_API_KEY")
 
-# llm = ChatNVIDIA(
-#         model=NVIDIA_MODEL,
-#         api_key=nvidia_api_key,
-#         temperature=LLM_TEMPERATURE,
-#         max_tokens=LLM_MAX_TOKENS
-#         chat_template_kwargs=NVIDIA_CHAT_TEMPLATE_KWARGS,
-#     )
+client = ChatNVIDIA(
+        model=NVIDIA_MODEL,
+        base_url="https://integrate.api.nvidia.com/v1",
+        api_key=nvidia_api_key,
+        temperature=LLM_TEMPERATURE,
+        max_tokens=LLM_MAX_TOKENS,
+        seed=42,
+    )
 
-llm = ChatGroq(
+llm_nvidia = client.bind(**{"chat_template_kwargs": {"enable_thinking": False}, "parallel_tool_calls": True})
+
+llm_groq = ChatGroq(
         model=GROQ_MODEL,
         api_key=groq_api_key,
         temperature=LLM_TEMPERATURE,
         max_tokens=LLM_MAX_TOKENS,
     )
 
-
+llm=llm_groq  # Default LLM for the app, can be switched to llm_nvidia if needed
 
 # Default: Nemotron 3.5 Embed 1B via NVIDIA API (developer-configured)
 from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
@@ -82,65 +88,65 @@ embedding_model = NVIDIAEmbeddings(
     truncate="END",
 )
 
-# Cache file for ConvFinQA embeddings (avoids recomputing on every restart)
-EMBEDDINGS_CACHE_PATH = Path(__file__).parent.parent / "data" / "convfinqa_embeddings_cache.npy"
+# # Cache file for ConvFinQA embeddings (avoids recomputing on every restart)
+# EMBEDDINGS_CACHE_PATH = Path(__file__).parent.parent / "data" / "convfinqa_embeddings_cache.npy"
 
-def _load_or_compute_finqa_embeddings():
-    """
-    Load ConvFinQA embeddings from cache, or compute and cache them lazily.
-    Uses batch embedding API for efficiency.
-    """
-    global df_finqa
+# def _load_or_compute_finqa_embeddings():
+#     """
+#     Load ConvFinQA embeddings from cache, or compute and cache them lazily.
+#     Uses batch embedding API for efficiency.
+#     """
+#     global df_finqa
     
-    # Check if cache exists and is valid
-    if EMBEDDINGS_CACHE_PATH.exists():
-        try:
-            print("📦 Loading ConvFinQA embeddings from cache...")
-            cached_embeddings = np.load(EMBEDDINGS_CACHE_PATH)
-            if len(cached_embeddings) == len(df_finqa):
-                df_finqa["summary_emb"] = list(cached_embeddings)
-                print(f"✅ Loaded {len(df_finqa)} embeddings from cache (dim: {len(cached_embeddings[0])})")
-                return
-            else:
-                print(f"⚠️  Cache size mismatch ({len(cached_embeddings)} vs {len(df_finqa)}), recomputing...")
-        except Exception as e:
-            print(f"⚠️  Failed to load cache: {e}, recomputing...")
+#     # Check if cache exists and is valid
+#     if EMBEDDINGS_CACHE_PATH.exists():
+#         try:
+#             print("📦 Loading ConvFinQA embeddings from cache...")
+#             cached_embeddings = np.load(EMBEDDINGS_CACHE_PATH)
+#             if len(cached_embeddings) == len(df_finqa):
+#                 df_finqa["summary_emb"] = list(cached_embeddings)
+#                 print(f"✅ Loaded {len(df_finqa)} embeddings from cache (dim: {len(cached_embeddings[0])})")
+#                 return
+#             else:
+#                 print(f"⚠️  Cache size mismatch ({len(cached_embeddings)} vs {len(df_finqa)}), recomputing...")
+#         except Exception as e:
+#             print(f"⚠️  Failed to load cache: {e}, recomputing...")
     
-    # Compute embeddings using batch API (much faster than sequential)
-    print("🔄 Computing ConvFinQA embeddings with Nemotron model (first run, this takes ~2-3 minutes)...")
-    texts = df_finqa["conv_text_full"].tolist()
+#     # Compute embeddings using batch API (much faster than sequential)
+#     print("🔄 Computing ConvFinQA embeddings with Nemotron model (first run, this takes ~2-3 minutes)...")
+#     texts = df_finqa["full_example"].tolist()
     
-    try:
-        # Use batch embedding for efficiency
-        embeddings = embedding_model.embed_documents(texts)
-        embeddings_array = np.array(embeddings)
+#     try:
+#         # Use batch embedding for efficiency
+#         embeddings = embedding_model.embed_documents(texts)
+#         embeddings_array = np.array(embeddings)
         
-        # Save to cache
-        np.save(EMBEDDINGS_CACHE_PATH, embeddings_array)
-        print(f"💾 Saved embeddings cache to {EMBEDDINGS_CACHE_PATH}")
-    except Exception as e:
-        print(f"⚠️  Batch embedding failed ({e}), falling back to sequential...")
-        embeddings = []
-        for i, text in enumerate(texts):
-            if i % 100 == 0:
-                print(f"  Progress: {i}/{len(texts)}")
-            embeddings.append(embedding_model.embed_query(text))
-        embeddings_array = np.array(embeddings)
-        np.save(EMBEDDINGS_CACHE_PATH, embeddings_array)
+#         # Save to cache
+#         np.save(EMBEDDINGS_CACHE_PATH, embeddings_array)
+#         print(f"💾 Saved embeddings cache to {EMBEDDINGS_CACHE_PATH}")
+#     except Exception as e:
+#         print(f"⚠️  Batch embedding failed ({e}), falling back to sequential...")
+#         embeddings = []
+#         for i, text in enumerate(texts):
+#             if i % 100 == 0:
+#                 print(f"  Progress: {i}/{len(texts)}")
+#             embeddings.append(embedding_model.embed_query(text))
+#         embeddings_array = np.array(embeddings)
+#         np.save(EMBEDDINGS_CACHE_PATH, embeddings_array)
     
-    df_finqa["summary_emb"] = list(embeddings_array)
-    print(f"✅ Computed {len(df_finqa)} ConvFinQA embeddings (dim: {len(embeddings_array[0])})")
+#     df_finqa["summary_emb"] = list(embeddings_array)
+#     print(f"✅ Computed {len(df_finqa)} ConvFinQA embeddings (dim: {len(embeddings_array[0])})")
 
-# Initialize embeddings lazily on first access
-# Use a flag to track initialization
-_finqa_embeddings_initialized = False
+# # Initialize embeddings lazily on first access
+# # Use a flag to track initialization
+# _finqa_embeddings_initialized = False
 
-def _ensure_finqa_embeddings():
-    """Ensure ConvFinQA embeddings are initialized (lazy initialization)."""
-    global _finqa_embeddings_initialized
-    if not _finqa_embeddings_initialized:
-        _load_or_compute_finqa_embeddings()
-        _finqa_embeddings_initialized = True
+# def _ensure_finqa_embeddings():
+#     """Ensure ConvFinQA embeddings are initialized (lazy initialization)."""
+#     global _finqa_embeddings_initialized
+#     if not _finqa_embeddings_initialized:
+#         _load_or_compute_finqa_embeddings()
+#         _finqa_embeddings_initialized = True
 
 # Don't initialize embeddings at import time - do it lazily when first needed
 # _ensure_finqa_embeddings()  # Commented out for fast startup
@@ -151,6 +157,7 @@ min_chunk_length = MIN_CHUNK_LENGTH
 class FinState(MessagesState):
     """ The state of the AI Assistant"""
     report_state: Annotated[bool, "Whether the financial report is provided by the user"]
+    is_finqa_doc: Annotated[bool, "Whether the uploaded document is a financial/FinQA-related document"]
     user_query: Annotated[List[str], "The list of questions from the user in continuous chat"]
     next_node: Annotated[Optional[str], "The next node to execute, either 'tool_node' or 'call_model_node'"]
     call_mode: Annotated[Literal['user','tool_call'], "The current mode of the call, either 'user' for model calls or 'tool_call' for tool executions"]
@@ -161,7 +168,7 @@ class FinState(MessagesState):
     query_cont: Annotated[List[str], "Whether this is a new query or a continuation of the previous ones"]
 
 def check_info_node(state: FinState):
-    """Check if the financial report is provided by the user"""
+    """Check if the input document context is provided by the user"""
     # Simple heuristic: if context_docs is empty or too short, we consider it insufficient
     if not state['report_state']:
 
@@ -192,6 +199,42 @@ def check_info_node(state: FinState):
             'next_node': state['next_node'],
             'query_cont': state['query_cont'],
             "messages": []}
+
+
+def classify_doc_node(state: FinState):
+    """Classify if the uploaded document is a financial/FinQA-related document."""
+    if not state['report_state']:
+        state['is_finqa_doc'] = False
+        state['next_node'] = "call_model_node"
+        return {**state, 'is_finqa_doc': state['is_finqa_doc'], 'next_node': state['next_node']}
+    
+    # Get df_docs from global (set by FinQAResponseAgent.predict)
+    global df_docs
+    if df_docs is None or df_docs.empty:
+        state['is_finqa_doc'] = False
+        state['next_node'] = "call_model_node"
+        return {**state, 'is_finqa_doc': state['is_finqa_doc'], 'next_node': state['next_node']}
+    
+    # Sample first few chunks for classification
+    sample_chunks = df_docs['content'].head(5).tolist()
+    sample_text = '\n\n---\n\n'.join(sample_chunks)
+    
+    prompt_template = PromptTemplate.from_template(
+        "Analyze the following document excerpts. Is this a financial report, earnings statement, "
+        "SEC filing, financial statement, or similar financial document? Answer only 'Yes' or 'No'.\n\n"
+        "Document excerpts:\n{sample_text}"
+    )
+    
+    chain = prompt_template | llm
+    response = chain.invoke({"sample_text": sample_text})
+    
+    is_financial = 'yes' in response.content.lower()
+    state['is_finqa_doc'] = is_financial
+    state['next_node'] = "call_model_node"
+    
+    print(f'Document classified as financial/FinQA: {is_financial}')
+    
+    return {**state, 'is_finqa_doc': state['is_finqa_doc'], 'next_node': state['next_node']}
 
 def should_continue_chat(state: FinState):
     """Determine whether to continue the chat or end the cycle."""
@@ -230,13 +273,17 @@ def call_model_node(state: FinState):
         query = state['user_query'][-1]
         queries = '\n'.join(state['query_cont'])
         relevant_docs = find_relevant_document_fast(embedding_model, queries, df_docs, 'content_embed', top_k=4)
-        relevant_finq_docs = find_relevant_document_fast(embedding_model, queries, df_finqa, 'summary_emb', top_k=2)
-
+        
         context_content = '\n'.join([doc for doc in relevant_docs['content']])
-        context_examples = '\n'.join([f"Example {i}: {doc}" for i,doc in enumerate(relevant_finq_docs['conv_text_full'])]) 
         state['context_content'] = context_content
-        state['context_examples'] = context_examples
-
+        # Only retrieve FinQA examples if document is financial/FinQA-related
+        if state.get('is_finqa_doc', False):
+            relevant_finq_docs = find_relevant_document_fast(embedding_model, queries, df_finqa, 'summary_emb', top_k=2)
+            context_examples = '\n'.join([f"Example {i}: {doc}" for i,doc in enumerate(relevant_finq_docs['full_example'])]) 
+            state['context_examples'] = context_examples
+        else:
+            state['context_examples'] = ""
+        
         user_message = user_message_new
     else:
         user_message = user_message_tool
@@ -253,7 +300,7 @@ def call_model_node(state: FinState):
 
     response = model_react.invoke({
         "context_content": context_content
-        , "context_examples": context_examples
+        , "context_examples": state['context_examples'] 
         , "chat_history": state["messages"]
         , "tool_names": ', '.join(tool_names)
         , "query": query
@@ -293,14 +340,16 @@ def should_continue_react(state: FinState):
 
 builder = StateGraph(FinState)
 builder.add_node("check_info_node", check_info_node)
+builder.add_node("classify_doc_node", classify_doc_node)
 builder.add_node("call_model_node", call_model_node)
 builder.add_node("tool_node", tool_node)
 
 builder.add_edge(START, "check_info_node")
 builder.add_conditional_edges("check_info_node",
                               should_continue_chat, 
-                              {"continue": "call_model_node",
+                              {"continue": "classify_doc_node",
                                "end": END})
+builder.add_edge("classify_doc_node", "call_model_node")
 builder.add_conditional_edges("call_model_node", 
                               should_continue_react, 
                               {"continue": "tool_node",
@@ -407,6 +456,7 @@ class FinQAResponseAgent:
             state = {
                 "messages": [],
                 "report_state": self.report_state,  
+                "is_finqa_doc": False,  # Will be determined by classify_doc_node
                 "user_query": [user_input],
                 "next_node": None,
                 "call_mode": "user",
@@ -420,6 +470,7 @@ class FinQAResponseAgent:
             state = existing_state.values
             state['user_query'].append(user_input)
             state['report_state'] = self.report_state  # Ensure it's updated
+            # Preserve is_finqa_doc from existing state
 
 
         state['messages'] = add_messages(state['messages'], HumanMessage(content=user_input))
