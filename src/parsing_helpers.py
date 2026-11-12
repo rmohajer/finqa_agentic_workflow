@@ -1,4 +1,5 @@
 import os
+import weaviate
 import yaml
 from pathlib import Path
 from langchain_groq import ChatGroq
@@ -517,6 +518,12 @@ def summarize_doc(doc, llm):
 
 
 def parse_embedding(s):
+    """Parse an embedding string into a numpy array of floats.
+
+    Accepts a numpy array, list, or string representation of a vector.
+    For strings, brackets are stripped and the numbers are split on commas
+    if present, otherwise on whitespace. Empty strings and '...' tokens are ignored.
+    """
     if isinstance(s, np.ndarray):
         return s
     if isinstance(s, list):
@@ -524,13 +531,52 @@ def parse_embedding(s):
     if not isinstance(s, str):
         raise ValueError(f"Unexpected embedding type: {type(s)}")
 
-    # Remove brackets and extra spaces
     s = s.strip().replace("[", "").replace("]", "")
-    # Split on commas
-    nums = re.split(r",", s.strip())
-    # Convert to float
-    return np.array([float(x) for x in nums if x != ""], dtype=float)
+    # Detect separator: comma if present, otherwise whitespace
+    if "," in s:
+        nums = re.split(r",", s)
+    else:
+        nums = re.split(r"\s+", s)
+    
+    return np.array([float(x) for x in nums if x.strip() != "" and x.strip() != "..."], dtype=float)
 
+
+# Parse array fields from string representations
+def parse_array(val, dtype=str):
+    """Parse a value into a list of elements of type `dtype`.
+
+    Handles None/NaN, string representations of lists (via literal_eval),
+    and existing lists. Returns an empty list for unparseable input.
+    """
+    if pd.isna(val):
+        return []
+    if isinstance(val, str):
+        try:
+            parsed = ast.literal_eval(val)
+            return [dtype(x) for x in parsed] if parsed else []
+        except Exception:
+            return []
+    if isinstance(val, list):
+        return [dtype(x) for x in val]
+    return []
+
+def parse_bool_array(val):
+    """Parse a value into a list of booleans.
+
+    Handles None/NaN, string representations of lists (via literal_eval),
+    and existing lists. Returns an empty list for unparseable input.
+    """
+    if pd.isna(val):
+        return []
+    if isinstance(val, str):
+        try:
+            parsed = ast.literal_eval(val)
+            return [bool(x) for x in parsed] if parsed else []
+        except Exception:
+            return []
+    if isinstance(val, list):
+        return [bool(x) for x in val]
+    return []
 
 
 def find_relevant_document_fast(embedding_model, query, df, embed_col, top_k=3):
@@ -723,3 +769,6 @@ def fin_doc_parser(document, embedding_model, min_chunk_length=500, docs=None, p
     df_docs['content_embed'] = df_docs['content'].apply(lambda x: embedding_model.embed_query(x))
 
     return df_docs, docs_with_meta
+
+
+

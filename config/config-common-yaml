@@ -26,3 +26,22 @@ DOC_AI_OCR_PROCESSOR_ID: "e1dfbf6e967f9ffe"
 DOC_AI_OCR_PROCESSOR_VERSION: "pretrained-ocr-v2.0-2023-06-02"
 # Parser type: "form" (paid), "ocr" (free tier), "layout" (paid)
 DOC_AI_PARSER_TYPE: "ocr"
+
+# Weaviate Vector Database Configuration
+CONVFINQA_DATA_PATH: "data/convfinqa_full.csv"
+WEAVIATE_COLLECTION_NAME: "ExampleFinQA"
+WEAVIATE_BATCH_SIZE: 100
+WEAVIATE_EMBEDDING_MODEL: "Snowflake/snowflake-arctic-embed-l-v2.0"
+
+# Weaviate Embedding Configuration
+# Options: "nvidia" (pre-computed NVIDIA Nemotron 3.5 Embed 1B), 
+#          "weaviate_snowflake" (Weaviate built-in Snowflake Arctic Embed L v2.0)
+WEAVIATE_EMBEDDING_MODE: "weaviate_snowflake"
+WEAVIATE_SNOWFLAKE_MODEL: "Snowflake/snowflake-arctic-embed-l-v2.0"
+
+# Weaviate Collection Fields
+# Properties to fetch when searching each collection (add one key per collection)
+WEAVIATE_COLLECTION_FIELDS:
+  ExampleFinQA: [record_id, summary, full_example, num_dialogue_turns, has_type2_question]
+# Property whose content is rendered into the "context_examples" prompt
+WEAVIATE_TEXT_FIELD: "full_example"
